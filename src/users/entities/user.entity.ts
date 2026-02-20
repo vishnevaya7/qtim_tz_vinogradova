@@ -1,4 +1,5 @@
-import {Column, CreateDateColumn, Entity, PrimaryGeneratedColumn} from "typeorm";
+import {Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn} from "typeorm";
+import {Article} from "../../articles/entities/article.entity";
 
 @Entity()
 export class User {
@@ -16,4 +17,6 @@ export class User {
 
     @CreateDateColumn()
     createdAt: Date;
+
+    @OneToMany(() => Article, article => article.author) articles: Article[];
 }

@@ -41,6 +41,7 @@ import {UsersModule} from "./users/users.module";
         AuthModule,
         ArticlesModule,
         UsersModule,
+        ArticlesModule,
     ],
     controllers: [AppController],
     providers: [AppService],
