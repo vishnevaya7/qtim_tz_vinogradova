@@ -26,15 +26,14 @@ import {UsersModule} from "./users/users.module";
             }),
             inject: [ConfigService],
         }),
-        // RedisModule.forRootAsync({ }),
         CacheModule.registerAsync({
             isGlobal: true,
             imports: [ConfigModule],
             useFactory: async (configService: ConfigService) => ({
-                store: 'redis',
+                store: 'redisStore',
                 host: configService.get('REDIS_HOST'),
                 port: +configService.get('REDIS_PORT'),
-                ttl: 60,
+                ttl: 300,
             }),
             inject: [ConfigService],
         }),
