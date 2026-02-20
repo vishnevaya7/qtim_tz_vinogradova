@@ -11,7 +11,15 @@ export class CreateArticleDto {
     description?: string;
 
     @IsOptional()
-    @IsDateString()
-    @Transform(({ value }) => value ? new Date(value) : null)
+    @Transform(({ value }) => {
+        if (value === null || value === undefined) {
+            return new Date();
+        }
+        const date = new Date(value);
+        if (!isNaN(date.getTime())) {
+            return date;
+        }
+        return date;
+    })
     published_at?: Date;
 }

@@ -8,7 +8,7 @@ import { UpdateArticleDto } from './dto/update-article.dto';
 interface PaginationOptions {
     page: number;
     limit: number;
-    authorId?: string;
+    authorId?: number;
     publishedAfter?: string;
 }
 
@@ -38,12 +38,16 @@ export class ArticlesService {
         return { items, total, page, limit };
     }
 
-    async create(createArticleDto: CreateArticleDto, authorId: string): Promise<Article> {
+    async findOne(id: number): Promise<Article | null> {
+        return this.articlesRepository.findOneBy({ id });
+    }
+
+    async create(createArticleDto: CreateArticleDto, authorId: number): Promise<Article> {
         const article = this.articlesRepository.create({ ...createArticleDto, author_id: authorId });
         return this.articlesRepository.save(article);
     }
 
-    async update(id: string, updateArticleDto: UpdateArticleDto, userId: string): Promise<Article> {
+    async update(id: number, updateArticleDto: UpdateArticleDto, userId: number): Promise<Article> {
         const article = await this.articlesRepository.findOne({
             where: { id },
             relations: ['author']
@@ -56,7 +60,7 @@ export class ArticlesService {
         return this.articlesRepository.save(article);
     }
 
-    async remove(id: string, userId: string): Promise<void> {
+    async remove(id: number, userId: number): Promise<void> {
         const article = await this.articlesRepository.findOne({ where: { id } });
         if (!article) throw new NotFoundException('Статья не найдена');
         if (article.author_id !== userId) throw new ForbiddenException('Нет прав на удаление');

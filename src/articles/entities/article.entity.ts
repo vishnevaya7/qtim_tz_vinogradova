@@ -3,8 +3,8 @@ import { User } from '../../users/entities/user.entity';
 
 @Entity('articles')
 export class Article {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+    @PrimaryGeneratedColumn()
+    id: number;
 
     @Column()
     title: string;
@@ -16,7 +16,7 @@ export class Article {
     published_at: Date;
 
     @Column()
-    author_id: string;
+    author_id: number;
 
     @ManyToOne(() => User, user => user.articles)
     @JoinColumn({ name: 'author_id' })
