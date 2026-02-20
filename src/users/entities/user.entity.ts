@@ -1,7 +1,8 @@
-import {Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn} from "typeorm";
-import {Article} from "../../articles/entities/article.entity";
+import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import { Article } from "../../articles/entities/article.entity";
+import { Exclude } from 'class-transformer';
 
-@Entity()
+@Entity('user')
 export class User {
     @PrimaryGeneratedColumn()
     id: number;
@@ -10,6 +11,7 @@ export class User {
     email: string;
 
     @Column()
+    @Exclude()
     password: string;
 
     @Column()
@@ -18,5 +20,6 @@ export class User {
     @CreateDateColumn()
     createdAt: Date;
 
-    @OneToMany(() => Article, article => article.author) articles: Article[];
+    @OneToMany(() => Article, (article) => article.author)
+    articles: Article[];
 }

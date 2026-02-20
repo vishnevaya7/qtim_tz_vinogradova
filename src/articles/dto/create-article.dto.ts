@@ -1,25 +1,21 @@
-import { IsString, IsNotEmpty, IsOptional, IsDateString } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, IsNotEmpty, IsOptional, IsDate } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateArticleDto {
+    @ApiProperty({ example: 'title', description: 'Заголовок статьи' })
     @IsString()
     @IsNotEmpty()
     title: string;
 
+    @ApiPropertyOptional({ example: 'description', description: 'Описание' })
     @IsString()
     @IsOptional()
     description?: string;
 
+    @ApiPropertyOptional({ example: '2000-01-01T00:00:00Z' })
     @IsOptional()
-    @Transform(({ value }) => {
-        if (value === null || value === undefined) {
-            return new Date();
-        }
-        const date = new Date(value);
-        if (!isNaN(date.getTime())) {
-            return date;
-        }
-        return date;
-    })
+    @Type(() => Date)
+    @IsDate()
     published_at?: Date;
 }

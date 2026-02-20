@@ -1,70 +1,85 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import {Repository, MoreThan} from 'typeorm';
+import { Repository } from 'typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { Article } from './entities/article.entity';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
+import {PaginatedArticles, PaginationOptions} from "./articles.interface";
 
-interface PaginationOptions {
-    page: number;
-    limit: number;
-    authorId?: number;
-    publishedAfter?: string;
-}
 
 @Injectable()
 export class ArticlesService {
+    private readonly CACHE_PREFIX = 'articles_list:';
+
     constructor(
         @InjectRepository(Article)
         private articlesRepository: Repository<Article>,
+        @Inject(CACHE_MANAGER) private cacheManager: Cache,
     ) {}
 
-    async findAll(options: PaginationOptions): Promise<{ items: Article[]; total: number; page: number; limit: number }> {
+    async findAll(options: PaginationOptions): Promise<PaginatedArticles> {
         const { page, limit, authorId, publishedAfter } = options;
-        const skip = (page - 1) * limit;
 
-        const where: any = {};
-        if (authorId) where.author_id = authorId;
-        if (publishedAfter) where.published_at = MoreThan(new Date(publishedAfter));
+        const cacheKey = `${this.CACHE_PREFIX}p${page}_l${limit}_a${authorId || 'all'}_d${publishedAfter || 'all'}`;
 
-        const [items, total] = await this.articlesRepository.findAndCount({
-            where,
-            skip,
-            take: limit,
-            order: { published_at: 'DESC' },
-            relations: ['author'],
-        });
+        const cachedData = await this.cacheManager.get<PaginatedArticles>(cacheKey);
+        if (cachedData) return cachedData;
 
-        return { items, total, page, limit };
+        const query = this.articlesRepository.createQueryBuilder('article')
+            .leftJoinAndSelect('article.author', 'author')
+            .skip((page - 1) * limit)
+            .take(limit)
+            .orderBy('article.published_at', 'DESC');
+
+        if (authorId) query.andWhere('article.author_id = :authorId', { authorId });
+        if (publishedAfter) query.andWhere('article.published_at > :publishedAfter', { publishedAfter: new Date(publishedAfter) });
+
+        const [items, total] = await query.getManyAndCount();
+        const result = { items, total, page, limit };
+        await this.cacheManager.set(cacheKey, result, 600000);
+
+        return result;
     }
 
-    async findOne(id: number): Promise<Article | null> {
-        return this.articlesRepository.findOneBy({ id });
-    }
-
-    async create(createArticleDto: CreateArticleDto, authorId: number): Promise<Article> {
-        const article = this.articlesRepository.create({ ...createArticleDto, author_id: authorId });
-        return this.articlesRepository.save(article);
-    }
-
-    async update(id: number, updateArticleDto: UpdateArticleDto, userId: number): Promise<Article> {
+    async findOne(id: number): Promise<Article> {
         const article = await this.articlesRepository.findOne({
             where: { id },
             relations: ['author']
         });
+        if (!article) throw new NotFoundException(`Статья с ID ${id} не найдена`);
+        return article;
+    }
 
-        if (!article) throw new NotFoundException('Статья не найдена');
-        if (article.author_id !== userId) throw new ForbiddenException('Нет прав на редактирование');
+    async create(dto: CreateArticleDto, authorId: number): Promise<Article> {
+        const article = this.articlesRepository.create({ ...dto, author_id: authorId });
+        const saved = await this.articlesRepository.save(article);
 
-        Object.assign(article, updateArticleDto);
-        return this.articlesRepository.save(article);
+        await this.invalidateCache();
+        return saved;
+    }
+
+    async update(id: number, dto: UpdateArticleDto, userId: number): Promise<Article> {
+        const article = await this.findOne(id);
+        if (article.author_id !== userId) throw new ForbiddenException('Вы не можете редактировать чужую статью');
+
+        Object.assign(article, dto);
+        const updated = await this.articlesRepository.save(article);
+
+        await this.invalidateCache();
+        return updated;
     }
 
     async remove(id: number, userId: number): Promise<void> {
-        const article = await this.articlesRepository.findOne({ where: { id } });
-        if (!article) throw new NotFoundException('Статья не найдена');
-        if (article.author_id !== userId) throw new ForbiddenException('Нет прав на удаление');
+        const article = await this.findOne(id);
+        if (article.author_id !== userId) throw new ForbiddenException('Вы не можете удалить чужую статью');
 
-        await this.articlesRepository.delete(id);
+        await this.articlesRepository.remove(article);
+        await this.invalidateCache();
+    }
+
+    private async invalidateCache() {
+            await this.cacheManager.clear();
     }
 }
