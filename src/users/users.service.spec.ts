@@ -6,7 +6,7 @@ import { UsersService } from './users.service';
 import { User } from './entities/user.entity';
 import * as bcrypt from 'bcrypt';
 
-// Улучшенный мок bcrypt
+// Mок bcrypt
 jest.mock('bcrypt');
 
 describe('UsersService', () => {
