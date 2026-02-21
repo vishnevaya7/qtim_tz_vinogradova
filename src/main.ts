@@ -6,15 +6,21 @@ import {DocumentBuilder, SwaggerModule} from "@nestjs/swagger";
 async function bootstrap() {
     const app = await NestFactory.create(AppModule);
 
-    app.useGlobalPipes(new ValidationPipe({ transform: true }));
+    // Автоматическая валидация входящих DTO и преобразование типов (например, string в number в Query)
+    app.useGlobalPipes(new ValidationPipe({
+        transform: true,
+        whitelist: true
+    }));
 
+    // Исключаем чувствительные данные (например, пароли) из ответов API на основе декораторов в Entity/DTO
     app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
 
+    // Настройка Swagger для документации и удобного тестирования эндпоинтов
     const config = new DocumentBuilder()
         .setTitle('Articles API')
         .setDescription('REST API для управления статьями с кэшированием и JWT')
         .setVersion('1.0')
-        .addBearerAuth()
+        .addBearerAuth() // Поддержка авторизации через JWT в интерфейсе Swagger
         .build();
 
     const document = SwaggerModule.createDocument(app, config);

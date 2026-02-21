@@ -11,7 +11,8 @@ import { UsersModule } from './users/users.module';
 
 @Module({
     imports: [
-        // Валидация конфига
+        // Валидация переменных окружения через Joi.
+        // Если в .env забудем про пароль или URL редиса — приложение упадет сразу, а не в рантайме.
         ConfigModule.forRoot({
             isGlobal: true,
             validationSchema: Joi.object({
@@ -26,7 +27,8 @@ import { UsersModule } from './users/users.module';
             }),
         }),
 
-        // TypeORM с поддержкой миграций
+        // Настройка TypeORM.
+        // synchronize: false — строго для прод-лайк среды, чтобы не потерять данные случайным авто-обновлением схемы.
         TypeOrmModule.forRootAsync({
             inject: [ConfigService],
             useFactory: (config: ConfigService) => ({
@@ -38,12 +40,13 @@ import { UsersModule } from './users/users.module';
                 database: config.get<string>('DB_NAME'),
                 schema: config.get<string>('DB_SCHEMA', 'public'),
                 autoLoadEntities: true,
-                synchronize: false,
-                logging: config.get('NODE_ENV') === 'development',
+                synchronize: false, // Используем миграции вместо авто-генерации таблиц
+                logging: config.get('NODE_ENV') === 'development', // Логируем запросы только при разработке
             }),
         }),
 
-        // Redis Cache (Keyv / Cache-Manager v5+)
+        // Интеграция Redis для кэширования.
+        // Используем Keyv для поддержки актуальных версий cache-manager (v5+).
         CacheModule.registerAsync({
             isGlobal: true,
             imports: [ConfigModule],
@@ -54,6 +57,8 @@ import { UsersModule } from './users/users.module';
                 ],
             }),
         }),
+
+        // Подключение функциональных модулей системы
         AuthModule,
         UsersModule,
         ArticlesModule,

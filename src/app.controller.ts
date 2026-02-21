@@ -22,6 +22,8 @@ export class AppController {
         }
     })
     getHealth() {
+        // Простейший Health Check. В будущем здесь можно добавить проверку
+        // соединений с БД и Redis (через @nestjs/terminus).
         return {
             status: 'ok',
             timestamp: new Date().toISOString(),

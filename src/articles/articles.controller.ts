@@ -21,8 +21,9 @@ export class ArticlesController {
     @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Количество записей (default: 10)' })
     @ApiQuery({ name: 'authorId', required: false, type: Number, description: 'ID автора для фильтрации' })
     @ApiQuery({ name: 'publishedAfter', required: false, type: String, description: 'ISO дата после' })
-    @ApiResponse({ status: 200, description: 'Успешное получение списка. ' })
+    @ApiResponse({ status: 200, description: 'Успешное получение списка. Данные могут быть возвращены из кэша Redis.' })
     findAll(
+        // Используем ParseIntPipe для Query-параметров, так как из URL они всегда приходят строками
         @Query('page', new ParseIntPipe({ optional: true })) page = 1,
         @Query('limit', new ParseIntPipe({ optional: true })) limit = 10,
         @Query('authorId', new ParseIntPipe({ optional: true })) authorId?: number,
@@ -41,12 +42,12 @@ export class ArticlesController {
     }
 
     @Post()
-    @UseGuards(JwtAuthGuard)
+    @UseGuards(JwtAuthGuard) // Защита эндпоинта: создание доступно только авторизованным пользователям
     @ApiBearerAuth()
     @ApiOperation({ summary: 'Создать новую статью' })
-    @ApiResponse({ status: 201, description: 'Статья создана. Кэш списков будет инвалидирован.' })
-    @ApiResponse({ status: 401, description: 'Не авторизован.' })
+    @ApiResponse({ status: 201, description: 'Статья создана. Кэш списков будет автоматически инвалидирован.' })
     create(@Body() dto: CreateArticleDto, @Request() req) {
+        // sub — это ID пользователя, извлеченный из JWT-токена в JwtStrategy
         return this.articlesService.create(dto, req.user.sub);
     }
 
@@ -54,6 +55,8 @@ export class ArticlesController {
     @UseGuards(JwtAuthGuard)
     @ApiBearerAuth()
     @ApiOperation({ summary: 'Обновить статью' })
+    @ApiResponse({ status: 200, description: 'Статья обновлена автором.' })
+    @ApiResponse({ status: 403, description: 'Отказ в доступе: попытка редактирования чужого контента.' })
     update(
         @Param('id', ParseIntPipe) id: number,
         @Body() dto: UpdateArticleDto,
@@ -65,11 +68,10 @@ export class ArticlesController {
     @Delete(':id')
     @UseGuards(JwtAuthGuard)
     @ApiBearerAuth()
-    @HttpCode(HttpStatus.NO_CONTENT)
+    @HttpCode(HttpStatus.NO_CONTENT) // Устанавливаем статус 204 для успешного удаления без тела ответа
     @ApiOperation({ summary: 'Удалить статью' })
-    @ApiResponse({ status: 204, description: 'Статья успешно удалена. Кэш инвалидирован.' })
-    @ApiResponse({ status: 403, description: 'Попытка удалить чужую статью.' })
-    @ApiResponse({ status: 404, description: 'Статья не найдена.' })
+    @ApiResponse({ status: 204, description: 'Статья успешно удалена.' })
+    @ApiResponse({ status: 403, description: 'Запрещено удалять статьи других авторов.' })
     remove(@Param('id', ParseIntPipe) id: number, @Request() req) {
         return this.articlesService.remove(id, req.user.sub);
     }

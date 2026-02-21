@@ -2,7 +2,7 @@ import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { CreateAuthDto } from "./dto/create-auth.dto";
-import {LoginDto} from "./dto/login.dto";
+import { LoginDto } from "./dto/login.dto";
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -14,6 +14,7 @@ export class AuthController {
     @ApiResponse({ status: 201, description: 'Пользователь успешно создан.' })
     @ApiResponse({ status: 409, description: 'Пользователь с таким email уже существует.' })
     register(@Body() createAuthDto: CreateAuthDto) {
+        // Передаем данные в сервис для обработки логики создания пользователя и хеширования пароля
         return this.authService.register(createAuthDto);
     }
 
@@ -32,6 +33,7 @@ export class AuthController {
     })
     @ApiResponse({ status: 401, description: 'Неверный email или пароль.' })
     login(@Body() loginDto: LoginDto) {
+        // Возвращаем токен и базовую информацию о пользователе для фронтенда
         return this.authService.login(loginDto);
     }
 }
