@@ -10,34 +10,26 @@ describe('ArticlesService', () => {
     let service: ArticlesService;
     let repo: Repository<Article>;
     let cache: any;
+    const mockArticle = {
+        id: 1,
+        title: 'Test Title',
+        description: 'Test Description',
+        authorId: 100,
+        publishedAt: new Date(),
+    } as unknown as Article;
 
-    // Мок данных
-    const mockArticle = { id: 1, title: 'Test', author_id: 100 } as Article;
-
-    // Мок репозитория
     const mockRepo = {
-        create: jest.fn().mockReturnValue(mockArticle),
-        save: jest.fn().mockResolvedValue(mockArticle),
+        create: jest.fn(),
+        save: jest.fn(),
         findOne: jest.fn(),
         remove: jest.fn(),
-        createQueryBuilder: jest.fn(() => ({
-            leftJoinAndSelect: jest.fn().mockReturnThis(),
-            skip: jest.fn().mockReturnThis(),
-            take: jest.fn().mockReturnThis(),
-            orderBy: jest.fn().mockReturnThis(),
-            andWhere: jest.fn().mockReturnThis(),
-            getManyAndCount: jest.fn().mockResolvedValue([[mockArticle], 1]),
-        })),
+        createQueryBuilder: jest.fn(),
     };
 
-    // Мок кэша
     const mockCache = {
         get: jest.fn(),
         set: jest.fn(),
-        del: jest.fn(),
-        store: {
-            keys: jest.fn().mockResolvedValue(['articles_list:1']),
-        },
+        clear: jest.fn(), // Сервис вызывает именно clear()
     };
 
     beforeEach(async () => {
@@ -58,60 +50,100 @@ describe('ArticlesService', () => {
         jest.clearAllMocks();
     });
 
-    describe('create', () => {
-        it('должен создать статью и очистить кэш', async () => {
-            const dto = { title: 'New Article' } as any;
-            const result = await service.create(dto, 100);
+    describe('findAll', () => {
+        const paginationOptions = { page: 1, limit: 10 };
 
-            expect(repo.create).toHaveBeenCalled();
-            expect(repo.save).toHaveBeenCalled();
-            expect(cache.store.keys).toHaveBeenCalled();
-            expect(cache.del).toHaveBeenCalled();
+        it('должен вернуть данные из кэша, если они существуют', async () => {
+            const cachedResult = { items: [mockArticle], total: 1, page: 1, limit: 10 };
+            mockCache.get.mockResolvedValue(cachedResult);
+
+            const result = await service.findAll(paginationOptions);
+
+            expect(cache.get).toHaveBeenCalled();
+            expect(repo.createQueryBuilder).not.toHaveBeenCalled();
+            expect(result).toEqual(cachedResult);
+        });
+
+        it('должен сделать запрос к БД и записать в кэш, если кэша нет', async () => {
+            mockCache.get.mockResolvedValue(null);
+
+            // Настройка сложного мока QueryBuilder
+            const queryBuilder: any = {
+                leftJoinAndSelect: jest.fn().mockReturnThis(),
+                skip: jest.fn().mockReturnThis(),
+                take: jest.fn().mockReturnThis(),
+                orderBy: jest.fn().mockReturnThis(),
+                andWhere: jest.fn().mockReturnThis(),
+                getManyAndCount: jest.fn().mockResolvedValue([[mockArticle], 1]),
+            };
+            mockRepo.createQueryBuilder.mockReturnValue(queryBuilder);
+
+            const result = await service.findAll(paginationOptions);
+
+            expect(repo.createQueryBuilder).toHaveBeenCalled();
+            expect(cache.set).toHaveBeenCalledWith(
+                expect.stringContaining('articles_list:'),
+                result,
+                600000
+            );
+            expect(result.items).toContain(mockArticle);
+        });
+    });
+
+    describe('create', () => {
+        it('должен создать статью и полностью очистить кэш', async () => {
+            const dto = { title: 'New' };
+            const userId = 100;
+
+            mockRepo.create.mockReturnValue(mockArticle);
+            mockRepo.save.mockResolvedValue(mockArticle);
+
+            const result = await service.create(dto as any, userId);
+
+            expect(repo.create).toHaveBeenCalledWith({ ...dto, authorId: userId });
+            expect(cache.clear).toHaveBeenCalled(); // Проверка инвалидации
             expect(result).toEqual(mockArticle);
         });
     });
 
     describe('update', () => {
-        it('должен обновить статью, если пользователь — автор', async () => {
-            jest.spyOn(service, 'findOne').mockResolvedValue(mockArticle);
+        it('должен обновить статью, если пользователь является автором', async () => {
+            const updateDto = { title: 'Updated Title' };
+            // Мокаем нахождение статьи через findOne
+            mockRepo.findOne.mockResolvedValue(mockArticle);
+            mockRepo.save.mockResolvedValue({ ...mockArticle, ...updateDto });
 
-            await service.update(1, { title: 'Updated' } as any, 100);
+            const result = await service.update(1, updateDto as any, 100);
 
             expect(repo.save).toHaveBeenCalled();
-            expect(cache.del).toHaveBeenCalled();
+            expect(cache.clear).toHaveBeenCalled();
+            expect(result.title).toBe('Updated Title');
         });
 
-        it('должен кинуть ForbiddenException, если обновляет не автор', async () => {
-            jest.spyOn(service, 'findOne').mockResolvedValue(mockArticle);
+        it('должен выбросить ForbiddenException, если редактирует не автор', async () => {
+            mockRepo.findOne.mockResolvedValue(mockArticle);
 
             await expect(
-                service.update(1, { title: 'Updated' } as any, 999),
+                service.update(1, { title: 'Hack' } as any, 999)
             ).rejects.toThrow(ForbiddenException);
         });
     });
 
-    describe('findAll (Cache Aside)', () => {
-        it('должен вернуть данные из кэша, если они там есть', async () => {
-            mockCache.get.mockResolvedValue({ items: [], total: 0 });
+    describe('remove', () => {
+        it('должен удалить статью и очистить кэш', async () => {
+            mockRepo.findOne.mockResolvedValue(mockArticle);
+            mockRepo.remove.mockResolvedValue(mockArticle);
 
-            const result = await service.findAll({ page: 1, limit: 10 });
+            await service.remove(1, 100);
 
-            expect(cache.get).toHaveBeenCalled();
-            expect(repo.createQueryBuilder).not.toHaveBeenCalled();
-            expect(result).toHaveProperty('total');
+            expect(repo.remove).toHaveBeenCalledWith(mockArticle);
+            expect(cache.clear).toHaveBeenCalled();
         });
 
-        it('должен идти в БД и сохранять в кэш, если кэш пуст', async () => {
-            mockCache.get.mockResolvedValue(null);
+        it('должен выбросить NotFoundException, если статьи не существует', async () => {
+            mockRepo.findOne.mockResolvedValue(null);
 
-            await service.findAll({ page: 1, limit: 10 });
-
-            expect(repo.createQueryBuilder).toHaveBeenCalled();
-            expect(cache.set).toHaveBeenCalledWith(
-                expect.stringContaining('articles_list:'),
-                expect.any(Object),
-                600000
-            );
+            await expect(service.remove(1, 100)).rejects.toThrow(NotFoundException);
         });
     });
 });

@@ -1,0 +1,69 @@
+### Переменные
+@baseUrl = http://localhost:3000
+@token = ТОКЕН
+@articleId = 1
+
+### 1. Регистрация нового пользователя
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "test_dev@example.com",
+  "password": "Password123!",
+  "name": "Middle Developer"
+}
+
+### 2. Логин
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "test_dev@example.com",
+  "password": "Password123!"
+}
+
+### 3. Создание статьи (Нужен токен)
+POST {{baseUrl}}/articles
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "title": "Как я настроил Redis в NestJS",
+  "description": "Это подробный гайд по кэшированию для Middle разработчиков.",
+  "publishedAt": "2026-02-21T12:00:00Z"
+}
+
+### 4. Получение всех статей (Проверка кэша)
+# Первый раз - 8-15мс, второй раз - 1-3мс
+GET {{baseUrl}}/articles
+Accept: application/json
+
+### 5. Фильтрация статей по автору
+GET {{baseUrl}}/articles?authorId=1
+Accept: application/json
+
+### 6. Пагинация (Страница 1, лимит 2)
+GET {{baseUrl}}/articles?page=1&limit=2
+Accept: application/json
+
+### 7. Получение одной статьи по ID
+GET {{baseUrl}}/articles/{{articleId}}
+Accept: application/json
+
+### 8. Обновление своей статьи
+PATCH {{baseUrl}}/articles/{{articleId}}
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "title": "Обновленный заголовок статьи"
+}
+
+### 9. Попытка удалить чужую статью (Должно вернуть 403)
+# Попробуй ID на тот, что создал другой юзер
+DELETE {{baseUrl}}/articles/999
+Authorization: Bearer {{token}}
+
+### 10. Удаление своей статьи
+DELETE {{baseUrl}}/articles/{{articleId}}
+Authorization: Bearer {{token}}

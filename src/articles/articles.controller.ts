@@ -1,6 +1,6 @@
 import {
     Controller, Get, Post, Put, Delete, Body, Param, Query,
-    UseGuards, Request, ParseIntPipe, HttpCode, HttpStatus
+    UseGuards, Request, ParseIntPipe, HttpCode, HttpStatus, Patch
 } from '@nestjs/common';
 import {
     ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiParam
@@ -50,13 +50,10 @@ export class ArticlesController {
         return this.articlesService.create(dto, req.user.sub);
     }
 
-    @Put(':id')
+    @Patch(':id')
     @UseGuards(JwtAuthGuard)
     @ApiBearerAuth()
     @ApiOperation({ summary: 'Обновить статью' })
-    @ApiResponse({ status: 200, description: 'Статья обновлена. Кэш инвалидирован.' })
-    @ApiResponse({ status: 403, description: 'Попытка отредактировать чужую статью.' })
-    @ApiResponse({ status: 404, description: 'Статья не найдена.' })
     update(
         @Param('id', ParseIntPipe) id: number,
         @Body() dto: UpdateArticleDto,

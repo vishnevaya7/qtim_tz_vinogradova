@@ -3,12 +3,12 @@ import { IsString, IsNotEmpty, IsOptional, IsDate } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateArticleDto {
-    @ApiProperty({ example: 'title', description: 'Заголовок статьи' })
+    @ApiProperty({ example: 'Заголовок статьи', description: 'Заголовок статьи' })
     @IsString()
     @IsNotEmpty()
     title: string;
 
-    @ApiPropertyOptional({ example: 'description', description: 'Описание' })
+    @ApiPropertyOptional({ example: 'Описание статьи', description: 'Описание' })
     @IsString()
     @IsOptional()
     description?: string;
@@ -17,5 +17,5 @@ export class CreateArticleDto {
     @IsOptional()
     @Type(() => Date)
     @IsDate()
-    published_at?: Date;
+    publishedAt?: Date;
 }

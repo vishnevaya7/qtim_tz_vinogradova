@@ -9,16 +9,16 @@ export class Article {
     @Column()
     title: string;
 
-    @Column('text', { nullable: true })
+    @Column({ type: 'text', nullable: true })
     description: string;
 
-    @Column({ type: 'timestamp', nullable: true })
-    published_at: Date;
+    @Column({ name: 'published_at', type: 'timestamp', nullable: true })
+    publishedAt: Date;
 
-    @Column()
-    author_id: number;
+    @Column({ name: 'author_id' })
+    authorId: number;
 
-    @ManyToOne(() => User, user => user.articles)
+    @ManyToOne(() => User, (user) => user.articles)
     @JoinColumn({ name: 'author_id' })
     author: User;
 }

@@ -5,9 +5,8 @@ import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import * as bcrypt from 'bcrypt';
 
-jest.mock('bcrypt', () => ({
-    compare: jest.fn(),
-}));
+// Мокаем bcrypt один раз для всего файла
+jest.mock('bcrypt');
 
 describe('AuthService', () => {
     let service: AuthService;
@@ -53,27 +52,39 @@ describe('AuthService', () => {
     describe('login', () => {
         const loginDto = { email: 'test@example.com', password: 'password123' };
 
-        it('должен вернуть access_token и данные пользователя при верных кредах', async () => {
-            (usersService.findByEmail as jest.Mock).mockResolvedValue(mockUser);
+        it('should return access_token and user data when credentials are valid', async () => {
+            // Используем spyOn для более чистой типизации
+            jest.spyOn(usersService, 'findByEmail').mockResolvedValue(mockUser as any);
             (bcrypt.compare as jest.Mock).mockResolvedValue(true);
 
             const result = await service.login(loginDto);
 
-            expect(usersService.findByEmail).toHaveBeenCalledWith(loginDto.email);
-            expect(bcrypt.compare).toHaveBeenCalledWith(loginDto.password, mockUser.password);
-            expect(jwtService.sign).toHaveBeenCalled();
-            expect(result).toHaveProperty('access_token', 'mock_token');
-            expect(result.user.email).toBe(mockUser.email);
+            // Проверяем, что в JWT попал правильный payload (sub и email)
+            expect(jwtService.sign).toHaveBeenCalledWith({
+                email: mockUser.email,
+                sub: mockUser.id,
+            });
+
+            expect(result).toEqual({
+                access_token: 'mock_token',
+                user: {
+                    id: mockUser.id,
+                    email: mockUser.email,
+                    name: mockUser.name,
+                },
+            });
         });
 
-        it('должен выбросить UnauthorizedException, если пользователь не найден', async () => {
-            (usersService.findByEmail as jest.Mock).mockResolvedValue(null);
+        it('should throw UnauthorizedException if user is not found', async () => {
+            jest.spyOn(usersService, 'findByEmail').mockResolvedValue(null);
 
-            await expect(service.login(loginDto)).rejects.toThrow(UnauthorizedException);
+            await expect(service.login(loginDto)).rejects.toThrow(
+                new UnauthorizedException('Неверный email или пароль'),
+            );
         });
 
-        it('должен выбросить UnauthorizedException при неверном пароле', async () => {
-            (usersService.findByEmail as jest.Mock).mockResolvedValue(mockUser);
+        it('should throw UnauthorizedException if password does not match', async () => {
+            jest.spyOn(usersService, 'findByEmail').mockResolvedValue(mockUser as any);
             (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
             await expect(service.login(loginDto)).rejects.toThrow(UnauthorizedException);
@@ -81,9 +92,11 @@ describe('AuthService', () => {
     });
 
     describe('register', () => {
-        it('должен просто вызывать метод создания в UsersService', async () => {
-            const dto = { email: 'new@test.com', password: '123', name: 'New' };
+        it('should call usersService.create with correct data', async () => {
+            const dto = { email: 'new@test.com', password: '123', name: 'New User' };
+
             await service.register(dto);
+
             expect(usersService.create).toHaveBeenCalledWith(dto);
         });
     });

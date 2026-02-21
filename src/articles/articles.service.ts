@@ -31,10 +31,17 @@ export class ArticlesService {
             .leftJoinAndSelect('article.author', 'author')
             .skip((page - 1) * limit)
             .take(limit)
-            .orderBy('article.published_at', 'DESC');
+            // 1. ИСПРАВЛЕНО: published_at -> publishedAt
+            .orderBy('article.publishedAt', 'DESC');
 
-        if (authorId) query.andWhere('article.author_id = :authorId', { authorId });
-        if (publishedAfter) query.andWhere('article.published_at > :publishedAfter', { publishedAfter: new Date(publishedAfter) });
+// 2. ИСПРАВЛЕНО: author_id -> authorId
+        if (authorId) query.andWhere('article.authorId = :authorId', { authorId });
+
+        if (publishedAfter) {
+            query.andWhere('article.publishedAt > :publishedAfter', {
+                publishedAfter: new Date(publishedAfter)
+            });
+        }
 
         const [items, total] = await query.getManyAndCount();
         const result = { items, total, page, limit };
@@ -52,17 +59,19 @@ export class ArticlesService {
         return article;
     }
 
-    async create(dto: CreateArticleDto, authorId: number): Promise<Article> {
-        const article = this.articlesRepository.create({ ...dto, author_id: authorId });
+    async create(dto: CreateArticleDto, userId: number): Promise<Article> {
+        const article = this.articlesRepository.create({
+            ...dto,
+            authorId: userId // Используем явный ID
+        });
         const saved = await this.articlesRepository.save(article);
-
         await this.invalidateCache();
         return saved;
     }
 
     async update(id: number, dto: UpdateArticleDto, userId: number): Promise<Article> {
         const article = await this.findOne(id);
-        if (article.author_id !== userId) throw new ForbiddenException('Вы не можете редактировать чужую статью');
+        if (article.authorId !== userId) throw new ForbiddenException('Вы не можете редактировать чужую статью');
 
         Object.assign(article, dto);
         const updated = await this.articlesRepository.save(article);
@@ -73,7 +82,7 @@ export class ArticlesService {
 
     async remove(id: number, userId: number): Promise<void> {
         const article = await this.findOne(id);
-        if (article.author_id !== userId) throw new ForbiddenException('Вы не можете удалить чужую статью');
+        if (article.authorId !== userId) throw new ForbiddenException('Вы не можете удалить чужую статью');
 
         await this.articlesRepository.remove(article);
         await this.invalidateCache();
